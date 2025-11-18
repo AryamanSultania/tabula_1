@@ -1,4 +1,4 @@
-INFO: Unfortunately I don't use MacOS anymore, so I won't be able to develop this further.
+INFO: Unfortunately I don't use MacOS anymore, so I won't be able to develop this further. You are free to fork this though!
 
 <img alt="NixOS" src="images/Tabula-512.png" width="150px"/>
 
