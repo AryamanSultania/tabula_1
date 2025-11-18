@@ -1,3 +1,5 @@
+INFO: Unfortunately I don't use MacOS anymore, so I won't be able to develop this further.
+
 <img alt="NixOS" src="images/Tabula-512.png" width="150px"/>
 
 # Tabula
