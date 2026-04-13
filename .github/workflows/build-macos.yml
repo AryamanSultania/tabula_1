@@ -1,0 +1,100 @@
+name: Build macOS App
+
+# Trigger on every push to the default branch and on all pull requests.
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+
+jobs:
+  build:
+    name: Build Tabula
+    runs-on: macos-latest
+    # Minimal permissions: read source code only; no write access needed.
+    permissions:
+      contents: read
+
+    steps:
+      # 1. Check out the repository code.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Detect the best build entry-point:
+      #    - Prefer a top-level .xcworkspace (e.g. when CocoaPods is used).
+      #    - Fall back to the .xcodeproj that ships with this repo.
+      - name: Detect workspace or project
+        id: detect
+        run: |
+          WORKSPACE=$(find . -maxdepth 2 -name "*.xcworkspace" \
+            ! -path "*.xcodeproj/*" \
+            -print -quit)
+
+          if [ -n "$WORKSPACE" ]; then
+            echo "BUILD_ARG=-workspace $WORKSPACE" >> "$GITHUB_OUTPUT"
+            echo "Detected workspace: $WORKSPACE"
+          else
+            XCODEPROJ=$(find . -maxdepth 2 -name "*.xcodeproj" -print -quit)
+            echo "BUILD_ARG=-project $XCODEPROJ" >> "$GITHUB_OUTPUT"
+            echo "Detected project: $XCODEPROJ"
+          fi
+
+      # 3. Build the app.
+      #    CODE_SIGNING_ALLOWED=NO / CODE_SIGNING_REQUIRED=NO let xcodebuild
+      #    produce an unsigned binary without a provisioning profile, which is
+      #    all that is needed for a CI artifact.
+      - name: Build (xcodebuild)
+        run: |
+          set -o pipefail
+
+          # Capture shared build flags in variables to avoid repetition.
+          BUILD_FLAGS=(
+            ${{ steps.detect.outputs.BUILD_ARG }}
+            -scheme Tabula
+            -destination "platform=macOS"
+            -configuration Release
+            -derivedDataPath "${{ runner.temp }}/DerivedData"
+            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGN_IDENTITY=""
+            build
+          )
+
+          # Use xcpretty for human-friendly output when available;
+          # fall back to raw xcodebuild output on failure.
+          xcodebuild "${BUILD_FLAGS[@]}" | xcpretty || xcodebuild "${BUILD_FLAGS[@]}"
+
+      # 4. Locate the freshly built .app bundle and copy it to a staging directory.
+      - name: Stage .app for packaging
+        run: |
+          APP_PATH=$(find "${{ runner.temp }}/DerivedData" \
+            -name "Tabula.app" -type d -print -quit)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Tabula.app not found in DerivedData" >&2
+            exit 1
+          fi
+
+          echo "Found app at: $APP_PATH"
+          mkdir -p "${{ runner.temp }}/artifacts"
+          cp -R "$APP_PATH" "${{ runner.temp }}/artifacts/Tabula.app"
+
+      # 5. Zip the staged .app so it can be uploaded as a single artifact.
+      #    The zip name embeds the short commit SHA for easy identification.
+      - name: Zip .app
+        run: |
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
+          cd "${{ runner.temp }}/artifacts"
+          zip -r "Tabula-${SHORT_SHA}.zip" Tabula.app
+          echo "ZIP_NAME=Tabula-${SHORT_SHA}.zip" >> "$GITHUB_ENV"
+
+      # 6. Upload the zipped .app as a workflow artifact, downloadable from
+      #    the Actions run page.
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tabula-${{ env.SHORT_SHA }}
+          path: ${{ runner.temp }}/artifacts/${{ env.ZIP_NAME }}
+          if-no-files-found: error
+          retention-days: 30
