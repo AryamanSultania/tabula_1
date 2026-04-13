@@ -95,7 +95,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             } else {
                 stillPressed = false
-                if initialPos != nil && lastPos != nil {
+                let returnCursor = UserDefaults.standard.object(forKey: "returnCursorToInitialPosition") == nil || UserDefaults.standard.bool(forKey: "returnCursorToInitialPosition")
+                if returnCursor && initialPos != nil && lastPos != nil {
                     let mouseEvent = CGEvent(mouseEventSource: nil, mouseType: CGEventType.mouseMoved, mouseCursorPosition: initialPos!, mouseButton: CGMouseButton.left)
                     mouseEvent?.post(tap: CGEventTapLocation.cghidEventTap)
                 }
