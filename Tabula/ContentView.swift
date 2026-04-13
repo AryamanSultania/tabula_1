@@ -17,6 +17,7 @@ struct ContentView: View {
     @AppStorage("yEnabled") private var yEnabled = true
     @AppStorage("needsPermission") private var needsPermission = false
     @AppStorage("triggerDelay") private var triggerDelay = 0.0
+    @AppStorage("returnCursorToInitialPosition") private var returnCursorToInitialPosition = true
     
     var body: some View {
         VStack {
@@ -48,6 +49,9 @@ struct ContentView: View {
                     HStack {
                         Toggle("X", isOn: $xEnabled)
                         Toggle("Y", isOn: $yEnabled)
+                    }
+                    LabeledContent("Cursor:") {
+                        Toggle("Return cursor to start position", isOn: $returnCursorToInitialPosition)
                     }
                     Slider(value: $scrollSpeed, in: 1...100) {
                         Text("Scroll Speed:")
